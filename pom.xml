@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>se.nelmico</groupId>
+    <artifactId>http-methods-discloser</artifactId>
+    <version>1.0</version>
+    <packaging>jar</packaging>
+
+    <name>http-methods-discloser</name>
+    <description>A Burp Suite extension to disclose http methods</description>
+
+    <developers>
+        <developer>
+            <name>xxux11</name>
+            <email>xxux11@gmail.com </email>
+            <url>https://github.com/xxux11</url>
+        </developer>
+    </developers>
+
+    <properties>
+        <!-- General project properties -->
+        <java.version>11</java.version>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+
+        <!-- Dependency versions -->
+        <burp-extender-api.version>2.1</burp-extender-api.version>
+        <apache-commons-lang3.version>3.11</apache-commons-lang3.version>
+        <apache-commons-io.version>2.8.0</apache-commons-io.version>
+        <!-- Plugin versions -->
+        <maven-compiler-plugin.version>3.8.1</maven-compiler-plugin.version>
+        <maven-surefire-plugin.version>2.22.2</maven-surefire-plugin.version>
+        <maven-assembly-plugin.version>3.3.0</maven-assembly-plugin.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>net.portswigger.burp.extender</groupId>
+            <artifactId>burp-extender-api</artifactId>
+            <version>${burp-extender-api.version}</version>
+            <scope>provided</scope>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-lang3</artifactId>
+            <version>${apache-commons-lang3.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>commons-io</groupId>
+            <artifactId>commons-io</artifactId>
+            <version>${apache-commons-io.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${java.version}</source>
+                    <target>${java.version}</target>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+                <version>${maven-assembly-plugin.version}</version>
+                <configuration>
+                    <appendAssemblyId>false</appendAssemblyId>
+                    <descriptorRefs>
+                        <descriptorRef>jar-with-dependencies</descriptorRef>
+                    </descriptorRefs>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>make-assembly</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>single</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
