@@ -3,16 +3,26 @@ package se.nelmico.httpmethodsdiscloser;
 import burp.*;
 import org.apache.commons.lang3.StringUtils;
 
+import java.net.URL;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 public class BurpExtender implements IBurpExtender {
-    public static final String NO_ALLOW_HEADER_AVAILABLE = "NO_ALLOW_HEADER_AVAILABLE";
+    public static final String ALLOW = "Allow:";
+    public static final String ACCESS_CONTROL_ALLOW_METHODS = "Access-Control-Allow-Methods:";
+    public static final String COMMA_DELIMITER = ",";
+    public static final String YELLOW = "yellow";
+    public static final String SEPARATOR = " - ";
+    public static final String TRACE = "TRACE";
+    public static final String HEAD = "HEAD";
     final static String OPTIONS = "OPTIONS";
-    final static List<String> EXCLUDE_EXTENSIONS = List.of(".png", ".jpg", ".gif", ".js", ".tif", ".ico", ".css");
+    final static List<String> EXCLUDE_EXTENSIONS = List.of(".png", ".jpg", ".gif", ".js", ".tif", ".ico", ".css", ".ttf", ".wof");
+    public static final String PERIOD = ".";
     final Charset charset = StandardCharsets.UTF_8;
     IBurpExtenderCallbacks callbacks;
 
@@ -27,6 +37,7 @@ public class BurpExtender implements IBurpExtender {
             @Override
             public void processProxyMessage(boolean messageIsRequest,
                                             IInterceptedProxyMessage message) {
+
                 if (!messageIsRequest) {
                     return;
                 }
@@ -34,13 +45,16 @@ public class BurpExtender implements IBurpExtender {
                 IExtensionHelpers helpers = callbacks.getHelpers();
 
                 IHttpRequestResponse messageInfo = message.getMessageInfo();
-                String req = new String(messageInfo.getRequest(), charset);
 
                 IRequestInfo iRequestInfo = helpers.analyzeRequest(messageInfo.getHttpService(), messageInfo.getRequest());
-                String url = iRequestInfo.getUrl().toExternalForm();
+                URL url = iRequestInfo.getUrl();
 
-                if (url.contains(".")) {
-                    String extension = url.substring(url.lastIndexOf(".")).toLowerCase().trim();
+                if (!callbacks.isInScope(url)) {
+                    return;
+                }
+
+                if (url.toExternalForm().contains(PERIOD)) {
+                    String extension = url.toExternalForm().substring(url.toExternalForm().lastIndexOf(PERIOD)).toLowerCase().trim();
                     boolean excludeExtension = EXCLUDE_EXTENSIONS.stream()
                             .anyMatch(ext -> extension.startsWith(ext.toLowerCase().trim()));
 
@@ -49,42 +63,56 @@ public class BurpExtender implements IBurpExtender {
                     }
                 }
 
+                String req = new String(messageInfo.getRequest(), charset);
+
                 String[] requestSplit = req.split(" ");
                 String originalHttpMethod = requestSplit[0];
                 requestSplit[0] = OPTIONS;
+
                 IHttpRequestResponse iHttpRequestResponse = callbacks.makeHttpRequest(messageInfo.getHttpService(),
                         StringUtils.join(requestSplit, " ").getBytes());
+
                 IResponseInfo iResponseInfo = helpers.analyzeResponse(iHttpRequestResponse.getResponse());
 
                 List<String> headers = iResponseInfo.getHeaders();
+
                 String allow = headers.stream()
-                        .filter(s1 -> s1.startsWith("Allow:"))
-                        .findFirst()
-                        .orElse(NO_ALLOW_HEADER_AVAILABLE);
+                        .filter(extractAllowMethodsHeader())
+                        .map(splitAllowMethodsValue())
+                        .collect(Collectors.joining(COMMA_DELIMITER));
 
-                if (allow.equals(NO_ALLOW_HEADER_AVAILABLE)) {
+
+                if (allow.isBlank() || allow.isEmpty()) {
                     return;
                 }
 
-                String allowValues = allow.split(":")[1].trim();
-
-                if (allowValues.length() == 0) {
-                    return;
-                }
-
-                List<String> otherHttpMethodsAvailable = Arrays.stream(allowValues.split(","))
-                        .filter(s -> !s.contains("HEAD"))
-                        .filter(s -> !s.contains("OPTIONS"))
-                        .filter(s -> !s.contains("TRACE"))
-                        .filter(s -> !s.contains(originalHttpMethod))
+                List<String> otherHttpMethodsAvailable = Arrays.stream(allow.split(COMMA_DELIMITER))
+                        .distinct()
                         .map(String::trim)
+                        .filter(Predicate.not(ignoreUnusefulMethods(originalHttpMethod)))
                         .collect(Collectors.toList());
 
                 if (otherHttpMethodsAvailable.size() > 0) {
-                    messageInfo.setComment(StringUtils.join(otherHttpMethodsAvailable, " - "));
-                    messageInfo.setHighlight("yellow");
+                    messageInfo.setComment(StringUtils.join(otherHttpMethodsAvailable, SEPARATOR));
+                    messageInfo.setHighlight(YELLOW);
                 }
             }
+
+            private Predicate<String> extractAllowMethodsHeader() {
+                return header -> header.startsWith(ALLOW) || header.startsWith(ACCESS_CONTROL_ALLOW_METHODS);
+            }
+
+            private Predicate<String> ignoreUnusefulMethods(final String originalHttpMethod) {
+                return method -> List.of(TRACE, OPTIONS, HEAD, originalHttpMethod)
+                        .stream()
+                        .anyMatch(method::equals);
+            }
+
+            private Function<String, String> splitAllowMethodsValue() {
+                return allowRow -> allowRow.split(":")[1];
+            }
+
         });
     }
+
 }
